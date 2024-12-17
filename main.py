@@ -15,7 +15,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Default streaming information
 STREAMING_INFO = {
-    'stream_key': os.getenv('STREAM_KEY', 'j208-hbz0-szgj-9k45-dea0'),  # Use environment variable or default value
+    'stream_key': os.getenv('STREAM_KEY', '7ycs-dgzb-veg2-ryk1-c3gm'),  # Use environment variable or default value
     'looping_video_path': 'vid.mp4',  # Path to looping video
     'audio_url_file': 'audio.txt'  # Path to audio URLs file
 }
