@@ -21,7 +21,7 @@ STREAMING_INFO = {
 }
 
 # Global flag to control streaming
-streaming_active = True
+streaming_active = False
 
 # Function to extract audio URLs from a file
 def extract_audio_from_file(file_path):
@@ -30,7 +30,7 @@ def extract_audio_from_file(file_path):
             audio_urls = file.readlines()
         return [url.strip() for url in audio_urls if url.strip()]  # Filter out empty lines and strip whitespace
     except Exception as e:
-        print(f"Error reading audio URLs from file: {e}")
+        print(f"[Error] Reading audio URLs from file: {e}")
         return []
 
 # Function to extract audio stream URL from a YouTube link
@@ -46,7 +46,7 @@ def extract_audio_from_url(youtube_url):
             info_dict = ydl.extract_info(youtube_url, download=False)
             return info_dict.get('url', None)
     except yt_dlp.utils.DownloadError as e:
-        print(f"Error extracting audio from {youtube_url}: {e}")
+        print(f"[Error] Extracting audio from {youtube_url}: {e}")
         return None
 
 # Function to stream audio with FFmpeg
@@ -68,9 +68,9 @@ def stream_audio(audio_url, looping_video_path, output_url):
         ]
         subprocess.run(ffmpeg_command, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Error streaming audio: {e}")
+        print(f"[Error] Streaming audio: {e}")
     except Exception as e:
-        print(f"Unexpected error streaming audio: {e}")
+        print(f"[Error] Unexpected error streaming audio: {e}")
 
 # Streaming logic
 def start_streaming():
@@ -82,63 +82,72 @@ def start_streaming():
 
     # Validate paths
     if not os.path.exists(audio_file):
-        print(f"Error: Audio file not found at {audio_file}.")
+        print(f"[Error] Audio file not found at {audio_file}.")
         return
     if not os.path.exists(looping_video):
-        print(f"Error: Looping video not found at {looping_video}.")
+        print(f"[Error] Looping video not found at {looping_video}.")
         return
 
     # Extract audio URLs
     audio_urls = extract_audio_from_file(audio_file)
     if not audio_urls:
-        print("Error: No audio URLs found in the file.")
+        print("[Error] No audio URLs found in the file.")
         return
 
     # Output streaming URL
     output_url = f"rtmp://a.rtmp.youtube.com/live2/{STREAMING_INFO['stream_key']}"
 
     if not STREAMING_INFO['stream_key']:
-        print("Error: Missing STREAM_KEY environment variable.")
+        print("[Error] Missing STREAM_KEY environment variable.")
         return
 
     # Loop through audio URLs and stream them
     while streaming_active:
         for audio_url in audio_urls:
             if not streaming_active:
-                print("Stopping the stream.")
+                print("[Info] Stopping the stream.")
                 break
             extracted_audio_url = extract_audio_from_url(audio_url)
             if extracted_audio_url:
-                print(f"Streaming from: {audio_url}")
-                print(f"Output URL: {output_url}")
+                print(f"[Info] Streaming from: {audio_url}")
+                print(f"[Info] Output URL: {output_url}")
                 stream_audio(extracted_audio_url, looping_video, output_url)
             else:
-                print(f"Error: Unable to extract audio from {audio_url}")
+                print(f"[Error] Unable to extract audio from {audio_url}")
         time.sleep(1)  # Short delay between loops
 
 # FastAPI routes for control
+@app.post("/start")
+async def start_stream():
+    global streaming_active
+    if streaming_active:
+        return JSONResponse(content={"message": "Streaming is already running."}, status_code=400)
+
+    # Set the streaming flag and start streaming
+    streaming_active = True
+    threading.Thread(target=start_streaming, daemon=True).start()
+    print("[Info] Streaming started.")
+    return JSONResponse(content={"message": "Streaming started!"}, status_code=200)
+
 @app.post("/stop")
 async def stop_stream():
     global streaming_active
     if streaming_active:
         streaming_active = False
-        print("Stopping the stream...")
+        print("[Info] Stopping the stream...")
         return JSONResponse(content={"message": "Streaming stopped!"}, status_code=200)
     else:
         return JSONResponse(content={"message": "Streaming is not running."}, status_code=400)
 
 @app.get("/")
 async def home():
-    return {"message": "Streaming is running!"}
+    return {"message": "Streaming is running!" if streaming_active else "Streaming is stopped."}
 
 # Entry point
 def main():
-    # Start streaming in a separate thread
-    threading.Thread(target=start_streaming, daemon=True).start()
-
     # Start FastAPI server
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT",8000)))
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
 
 if __name__ == "__main__":
     main()
