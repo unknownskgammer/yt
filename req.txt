@@ -1,0 +1,5 @@
+yt-dlp
+python-ffmpeg
+flask
+fastapi
+uvicorn
